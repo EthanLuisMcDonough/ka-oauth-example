@@ -27,10 +27,10 @@ app.use(session({
     }
 }));
 
-function internalServerError(response, err) {
+const internalServerError = response => err => {
     console.error(err);
     response.status(500).send("Internal server error");
-}
+};
 
 const client = (() => {
     const callback = `http://localhost:${PORT}${OAUTH_CALLBACK_PATH}`;
@@ -44,22 +44,26 @@ const client = (() => {
 })();
 
 app.get("/", (request, response) => {
-    const { userInfo } = request.session;
-    if (userInfo) {
+    const { token, tokenSecret } = request.session;
+    if (token && tokenSecret) {
         response.type("html");
-        response.status(200).send(`
-            <!DOCTYPE html>
-            <title>Demo</title>
-            <p>You have ${userInfo.discussionBanned ? "" : "not"}
-                been banned from KA</p>
-            <p>Your email: ${escapeHtml(userInfo.email)}</p>
-            <p><a href="${LOGOUT_PATH}">Logout</a></p>
-        `);
+        client.auth(token, tokenSecret)
+            .get("/api/v1/user", { casing: "camel" })
+            .then(httpResponse => httpResponse.body)
+            .then(userInfo => response.send(`
+                <!DOCTYPE html>
+                <title>Demo</title>
+                <p>You have ${userInfo.discussionBanned ? "" : "not"}
+                    been banned from KA</p>
+                <p>Your email: ${escapeHtml(userInfo.email)}</p>
+                <p><a href="${LOGOUT_PATH}">Logout</a></p>
+            `))
+            .catch(internalServerError(response));
     } else {
         client.requestToken()
             .then(r => `https://www.khanacademy.org/api/auth2/authorize?oauth_token=${r.token}`)
             .then(url => response.redirect(url))
-            .catch(internalServerError.bind(null, response));
+            .catch(internalServerError(response));
     }
 });
 
@@ -72,16 +76,10 @@ app.get(OAUTH_CALLBACK_PATH, (request, response) => {
             query.oauth_verifier
         ).then(r => {
             const { token, tokenSecret } = r;
-            return client.auth(token, tokenSecret)
-                .get("/api/v1/user", { casing: "camel" })
-                .then(httpResponse => {
-                    const userInfo = httpResponse.body;
-                    Object.assign(session, {
-                        userInfo, token, tokenSecret
-                    });
-                    response.redirect("/");
-                });
-        }).catch(internalServerError.bind(null, response))
+            session.token = token;
+            session.tokenSecret = tokenSecret;
+            response.redirect("/");
+        }).catch(internalServerError(response));
     } else {
         response.status(400).send("Bad request");
     }
@@ -92,4 +90,4 @@ app.get(LOGOUT_PATH, (request, response) =>
 
 app.listen(PORT);
 
-console.log("Running...");
+console.info("Running...");
