@@ -2,7 +2,7 @@ require("dotenv").config();
 
 const express = require("express");
 const session = require("express-session");
-const OAuthClient = require('oauth-1-client');
+const OAuthClient = require("oauth-1-client");
 const escapeHtml = require("escape-html");
 
 const PORT = 3000;
