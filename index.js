@@ -61,7 +61,7 @@ app.get("/", (request, response) => {
             .catch(internalServerError(response));
     } else {
         client.requestToken()
-            .then(r => `https://www.khanacademy.org/api/auth2/authorize?oauth_token=${r.token}`)
+            .then(r => `https://${KA}/api/auth2/authorize?oauth_token=${r.token}`)
             .then(url => response.redirect(url))
             .catch(internalServerError(response));
     }
